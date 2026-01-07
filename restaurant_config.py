@@ -38,7 +38,8 @@ RESTAURANT_DATA = {
             {"nom": "Panini Poulet", "prix": 6.50, "desc": "Poulet, fromage"},
             {"nom": "Panini Jambon", "prix": 6.00, "desc": "Jambon, emmental"},
             {"nom": "Sandwich Américain", "prix": 7.00, "desc": "Boeuf, oignons"},
-            {"nom": "Kebab", "prix": 7.50, "desc": "Pain libanais, kebab, salade"}
+            {"nom": "Kebab", "prix": 7.50, "desc": "Pain libanais, kebab, salade", "alias": ["grec", "sandwich grec"]},
+            {"nom": "Grec", "prix": 7.50, "desc": "Identique au Kebab", "redirect": "Kebab"}
         ],
 
         "accompagnements": [
@@ -68,17 +69,26 @@ RESTAURANT_DATA = {
         "Menu Burger": {
             "prix": 12.50,
             "contenu": ["Burger au choix", "Frites", "Boisson"],
-            "desc": "Burger + Frites + Boisson"
+            "desc": "Burger + Frites + Boisson",
+            "etapes": ["plat", "sauce", "boisson"]
         },
         "Menu Tacos": {
             "prix": 10.50,
             "contenu": ["Tacos au choix", "Frites", "Boisson"],
-            "desc": "Tacos + Frites + Boisson"
+            "desc": "Tacos + Frites + Boisson",
+            "etapes": ["plat", "sauce", "boisson"]
+        },
+        "Menu Kebab": {
+            "prix": 9.50,
+            "contenu": ["Kebab/Grec", "Boisson"],
+            "desc": "Kebab + Boisson",
+            "etapes": ["sauce", "crudites", "boisson", "options"]
         },
         "Menu Enfant": {
             "prix": 7.50,
             "contenu": ["Nuggets 6", "Petites Frites", "Boisson", "Surprise"],
-            "desc": "Menu pour les enfants"
+            "desc": "Menu pour les enfants",
+            "etapes": ["sauce", "boisson"]
         }
     },
 
@@ -113,6 +123,13 @@ RESTAURANT_DATA = {
         "Andalouse"
     ],
 
+    "crudites": [
+        "Salade",
+        "Tomates",
+        "Oignons",
+        "Cornichons"
+    ],
+
     "paiements": [
         "Espèces",
         "Carte Bancaire",
@@ -139,8 +156,16 @@ RESTAURANT_DATA = {
         "supplement_oeuf": 1.00,
         "sans_oignons": 0.00,
         "sans_tomate": 0.00,
-        "pain_sans_gluten": 1.50
-    }
+        "sans_salade": 0.00,
+        "pain_sans_gluten": 1.50,
+        "extra_viande": 2.00
+    },
+
+    "items_avec_menu": ["burger", "tacos", "kebab", "grec", "sandwich"],
+
+    "items_necessitant_sauce": ["burger", "tacos", "kebab", "grec", "sandwich", "panini"],
+
+    "items_necessitant_crudites": ["kebab", "grec"]
 }
 
 
