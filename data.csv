@@ -1,0 +1,49 @@
+id_interne,categorie,nom_affiche,nom_synonymes,description_courte,ingredients,base,taille,options_obligatoires,options_facultatives,prix_unitaire,prix_menu,disponible,peut_etre_menu,temps_preparation_min
+PIZZA001,pizza,"Pizza Margherita","margherita;marguerita;pizza tomate fromage","Pizza classique tomate mozzarella","tomate,mozzarella,origan","tomate",moyenne,"taille","supp_fromage,supp_oeuf,oignon,poivron,champignon",8.50,11.50,true,true,12
+PIZZA002,pizza,"Pizza Mexicaine","mexicaine;poulet oignons","Pizza poulet épicé oignons poivrons","poulet,oignons,poivrons,épices","tomate",moyenne,"taille","supp_fromage,supp_oeuf,oignon,poivron,champignon",8.50,11.50,true,true,15
+PIZZA003,pizza,"Pizza Orientale","orientale;kebab merguez","Pizza kebab merguez épicée","viande kebab,merguez,oignons","tomate",moyenne,"taille","supp_fromage,oignon,poivron",8.50,11.50,true,true,15
+PIZZA004,pizza,"Pizza Américaine","americaine;jambon champi","Pizza jambon champignons poivrons","jambon,champignons,poivrons","tomate",moyenne,"taille","supp_fromage,oignon,poivron",8.50,11.50,true,true,12
+PIZZA005,pizza,"Pizza Spéciale","speciale;frites fromage","Pizza frites oignons poivrons","frites,oignons,poivrons,fromage","tomate",moyenne,"taille","supp_fromage,oignon,poivron",8.50,11.50,true,true,15
+PIZZA006,pizza,"Pizza Sardine","sardine","Pizza sardine crème fraîche","sardines,crème fraîche","crème",moyenne,"taille","supp_fromage",9.50,12.50,true,true,12
+PIZZA007,pizza,"Pizza Neptune","neptune;thon maïs","Pizza thon maïs œuf","thon,maïs,œuf","crème",moyenne,"taille","supp_fromage",9.50,12.50,true,true,12
+PIZZA008,pizza,"Pizza Pacifique","pacifique;oignons champi","Pizza oignons champignons poivrons","oignons,champignons,poivrons","crème",moyenne,"taille","supp_fromage",9.50,12.50,true,true,12
+PIZZA009,pizza,"Pizza Lorraine","lorraine;lardons","Pizza lardons crème fraîche","lardons,crème fraîche","crème",moyenne,"taille","supp_fromage",10.00,13.00,true,true,12
+PIZZA010,pizza,"Pizza Toscane","toskane;merguez","Pizza merguez oignons poivrons","merguez,oignons,poivrons","crème",moyenne,"taille","supp_fromage",10.00,13.00,true,true,15
+PIZZA011,pizza,"Pizza Granite","granite;merguez crème","Pizza merguez crème spéciale","merguez,crème fraîche","spéciale",moyenne,"taille","supp_fromage",11.50,14.50,true,true,18
+PIZZA012,pizza,"Pizza Algérienne","algerienne;viande épicée","Pizza viande épicée merguez","viande épicée,merguez","spéciale",moyenne,"taille","supp_fromage",11.50,14.50,true,true,18
+SANDWICH001,sandwich,"Kebab","kebab;viande kebab;grec","Sandwich kebab sauce","viande kebab,Salade,sauce",normal,"viande","sauce_blonde,supp_fromage,supp_oeuf",6.00,9.00,true,true,8
+SANDWICH002,sandwich,"Steak Haché","steak;steak haché","Sandwich steak haché","steak haché,Salade,sauce",normal,"viande","sauce_blonde,supp_fromage,supp_oeuf",6.00,9.00,true,true,8
+SANDWICH003,sandwich,"Merguez","merguez","Sandwich merguez épicée","merguez,Salade,sauce",normal,"viande","sauce_blonde,supp_fromage",6.50,9.50,true,true,8
+SANDWICH004,sandwich,"Chicken","chicken;poulet","Sandwich poulet pané","poulet pané,Salade,sauce",normal,"viande","sauce_blonde,supp_fromage,supp_oeuf",6.50,9.50,true,true,8
+BURGER001,burger,"Cheese Burger","cheese burger","Burger steak fromage","steak,fromage,Salade",normal,"taille","bacon,oeuf,cheddar double",8.50,11.50,true,true,10
+BURGER002,burger,"Double Cheese","double cheese;double","2 steaks fromage","2 steaks,fromage,Salade",normal,"taille","bacon,oeuf,cheddar double",10.00,13.00,true,true,12
+BURGER003,burger,"Deluxe","deluxe;bacon oeuf","Burger steak bacon œuf","steak,bacon,œuf,Salade",normal,"taille","cheddar double",11.00,14.00,true,true,12
+BURGER004,burger,"Cheddar King","cheddar king;3 steaks","3 steaks cheddar","3 steaks,cheddar,Salade",normal,"taille","bacon",12.00,15.00,true,true,15
+BURGER005,burger,"Triple Cheddar","triple cheddar;triple","3 steaks triple cheddar","3 steaks,triple cheddar",normal,"taille","bacon",14.00,17.00,true,true,18
+BURGER006,burger,"Fish Burger","fish burger;poisson","Burger poisson pané","poisson pané,Salade",normal,"taille","fromage",9.00,12.00,true,true,12
+BURGER007,burger,"Chicken Burger","chicken burger;poulet","Burger poulet pané","poulet pané,Salade",normal,"taille","fromage",9.50,12.50,true,true,12
+TACOS001,tacos,"Tacos 1 Viande","tacos simple;tacos","Tacos 1 viande au choix","boeuf OU poulet,Salade,frites",normal,"nb_viandes,viandes","sauce_samouraï,sauce_andalous,sauce_barbecue,sauce_big_gourmet,sauce_cheddar,sauce_pesto,sauce_miel_moutarde",6.00,9.00,true,true,8
+TACOS002,tacos,"Tacos 2 Viandes","tacos double","Tacos 2 viandes","boeuf+poulet OU merguez,Salade,frites",normal,"nb_viandes,viandes","sauce_samouraï,sauce_andalous,sauce_barbecue,sauce_big_gourmet,sauce_cheddar,sauce_pesto,sauce_miel_moutarde",8.00,11.00,true,true,10
+TACOS003,tacos,"Tacos 3 Viandes","tacos triple","Tacos 3 viandes","boeuf+poulet+merguez,Salade,frites",normal,"nb_viandes,viandes","sauce_samouraï,sauce_andalous,sauce_barbecue,sauce_big_gourmet,sauce_cheddar,sauce_pesto,sauce_miel_moutarde",10.00,13.00,true,true,12
+SALADES001,salade,"Salade Parmesan","parmesan","Salade parmesan","parmesan,Salade verte",normal,"","chicken",8.00,11.00,true,true,5
+SALADES002,salade,"Salade Océane","oceane;thon maïs","Salade thon maïs œufs","thon,maïs,œufs,Salade",normal,"","chicken",8.50,11.50,true,true,5
+SALADES003,salade,"Salade Bolo","bolo;bolognaise","Salade viande bolognaise","viande bolognaise,Salade",normal,"","chicken",8.50,11.50,true,true,5
+SALADES004,salade,"Salade Brie Noix","brie noix","Salade brie et noix","brie,noix,Salade",normal,"","chicken",9.00,12.00,true,true,5
+PASTES001,pates,"Pâtes 4 Fromages","4 fromages","Pâtes sauce 4 fromages","4 fromages,crème",normal,"taille","",8.00,11.00,true,true,12
+PASTES002,pates,"Pâtes Forestière","forestiere;champignons","Pâtes champignons forestiers","champignons forestiers,crème",normal,"taille","",8.50,11.50,true,true,12
+PASTES003,pates,"Pâtes Saumon","saumon","Pâtes saumon crème","saumon,crème",normal,"taille","",9.50,12.50,true,true,15
+PANINIS001,panini,"Panini Chèvre Miel","chevre miel","Panini chèvre miel","chèvre,miel",normal,"taille","",7.00,10.00,true,true,8
+PANINIS002,panini,"Panini Jambon Fromage","jambon fromage","Panini jambon emmental","jambon,emmental",normal,"taille","",7.00,10.00,true,true,8
+PANINIS003,panini,"Panini Thon Piment","thon piment","Panini thon piment","thon,piment",normal,"taille","",7.00,10.00,true,true,8
+PANINIS004,panini,"Panini Saumon Fumé","saumon fume","Panini saumon fumé","saumon fumé",normal,"taille","",8.00,11.00,true,true,8
+BOISSON001,boisson,"Coca 25cl","coca petit;coca","Coca-Cola 25cl","Coca-Cola",25cl,"taille","",1.50,0.00,true,false,1
+BOISSON002,boisson,"Coca 50cl","coca grand","Coca-Cola 50cl","Coca-Cola",50cl,"taille","",2.50,0.00,true,false,1
+BOISSON003,boisson,"Ice Tea 50cl","ice tea;icetea;thé glacé","Ice Tea pêche 50cl","Thé glacé pêche",50cl,"taille","",2.50,0.00,true,false,1
+BOISSON004,boisson,"Fanta 50cl","fanta;orange","Fanta Orange 50cl","Fanta",50cl,"taille","",2.50,0.00,true,false,1
+BOISSON005,boisson,"Sprite 50cl","sprite","Sprite 50cl","Sprite",50cl,"taille","",2.50,0.00,true,false,1
+BOISSON006,boisson,"Oasis 50cl","oasis","Oasis tropical 50cl","Oasis",50cl,"taille","",2.50,0.00,true,false,1
+BOISSON007,boisson,"Evian 50cl","eau;evian","Eau Evian 50cl","Evian",50cl,"taille","",2.00,0.00,true,false,1
+BOISSON008,boisson,"Bière 33cl","biere","Bière 33cl","Bière",33cl,"taille","",3.50,0.00,true,false,1
+DESSERT001,dessert,"Milk Shake 500ml","milk shake;milkshake","Milk shake 500ml","Lait,saveurs",500ml,"saveur","saveur_chocolat,saveur_vanille,saveur_fraise",4.00,0.00,true,false,3
+DESSERT002,dessert,"Crêpe Nutella","crepe nutella;crepe","Crêpe au Nutella","Crêpe,Nutella",normal,"","",4.00,0.00,true,false,5
+DESSERT003,dessert,"Tarte Tatin","tarte tatin;tarte","Tarte aux pommes caramel","Pommes,caramel,pâte feuilletée",normal,"","",4.00,0.00,true,false,5

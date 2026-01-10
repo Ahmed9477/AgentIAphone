@@ -5,7 +5,20 @@ import json
 from datetime import datetime
 import os
 from dotenv import load_dotenv
-from restaurant_config import RESTAURANT_NAME, RESTAURANT_DATA
+
+# Import depuis restaurant_config_csv.py
+from restaurant_config import (
+    RESTAURANT_NAME,
+    RESTAURANT_DATA,
+    MENU_DATA,
+    get_item_by_name,
+    get_category_items,
+    search_items,
+    get_all_categories,
+    calculate_total,
+    build_menu_context,
+    format_order_summary
+)
 
 # Charger les variables d'environnement
 load_dotenv()
@@ -40,8 +53,7 @@ def cleanup_old_conversations():
             to_delete.append(call_sid)
             continue
 
-        # Supprimer SEULEMENT si conversation trop longue (plus de 50 messages)
-        # Augmenté de 30 à 50 pour éviter de supprimer pendant un appel actif
+        # Supprimer si conversation trop longue (plus de 50 messages)
         if len(conv) > 50:
             to_delete.append(call_sid)
             continue
@@ -61,75 +73,62 @@ def cleanup_old_conversations():
 
 def detect_conversation_stage(history):
     """Détecte automatiquement l'étape de la conversation"""
-    if len(history) < 4:
-        return "commande"  # Prise de commande
-    elif len(history) < 8:
-        return "livraison"  # Type de livraison
-    elif len(history) < 12:
-        return "infos_client"  # Infos client
-    else:
-        return "finalisation"  # Finalisation
+    # Compter les messages
+    num_messages = len(history)
+
+    # Analyser le contenu pour détecter l'étape
+    user_messages = [msg["content"].lower() for msg in history if msg["role"] == "user"]
+    assistant_messages = [msg["content"].lower() for msg in history if msg["role"] == "assistant"]
+
+    # Si on a demandé le paiement, on est en finalisation
+    if any("espèces" in msg or "carte" in msg or "ticket" in msg for msg in assistant_messages[-3:]):
+        return "finalisation"
+
+    # Si on a demandé nom/téléphone/adresse, on est en infos_client
+    if any("nom" in msg or "téléphone" in msg or "adresse" in msg for msg in assistant_messages[-3:]):
+        return "infos_client"
+
+    # Si on a demandé sur place/emporter/livraison
+    if any("sur place" in msg or "emporter" in msg or "livraison" in msg for msg in assistant_messages[-3:]):
+        return "livraison"
+
+    # Sinon on est en commande
+    return "commande"
 
 
 def extract_order_summary(history):
     """Extrait un résumé des articles commandés"""
-    user_messages = [msg["content"] for msg in history if msg["role"] == "user"]
-
-    if not user_messages:
+    if not history:
         return "Nouvelle commande"
 
-    # Prendre les 3 premiers messages utilisateur pour le contexte
-    recent = " ".join(user_messages[:3])
-    return recent[:100] + "..." if len(recent) > 100 else recent
+    # Extraire tous les articles mentionnés par l'utilisateur
+    ordered_items = []
 
+    for i, msg in enumerate(history):
+        if msg["role"] == "user":
+            content = msg["content"].lower()
 
-def build_menu_context():
-    """Construit le contexte du menu pour l'IA"""
-    menu_items = []
+            # Détecter les mots-clés d'articles
+            keywords = ["kebab", "pizza", "burger", "tacos", "salade", "pâtes", "panini",
+                        "dessert", "milkshake", "crêpe", "tarte", "coca", "fanta", "sprite"]
 
-    for category, items in RESTAURANT_DATA["menu"].items():
-        category_name = category.capitalize()
-        for item in items:
-            # Ignorer les redirections (comme "Grec" qui pointe vers "Kebab")
-            if "redirect" not in item:
-                menu_items.append(f"{item['nom']} ({item['prix']}€)")
+            for keyword in keywords:
+                if keyword in content:
+                    ordered_items.append(keyword)
 
-    sauces = ", ".join(RESTAURANT_DATA["sauces"])
-    crudites = ", ".join(RESTAURANT_DATA["crudites"])
+    if ordered_items:
+        summary = f"Articles: {', '.join(set(ordered_items))}"
+        return summary[:100]
 
-    return f"""
-MENU DISPONIBLE:
-{', '.join(menu_items[:15])}... et plus
-
-IMPORTANT: "Grec" = "Kebab" (même produit)
-
-MENUS COMPLETS:
-• Menu Kebab/Grec: 9.50€ (Kebab + Boisson)
-• Menu Burger: 12.50€ (Burger + Frites + Boisson)
-• Menu Tacos: 10.50€ (Tacos + Frites + Boisson)
-
-SAUCES: {sauces}
-CRUDITÉS: {crudites}
-
-SERVICES:
-• Livraison: +{RESTAURANT_DATA['services']['livraison']['frais']}€, min {RESTAURANT_DATA['services']['livraison']['minimum']}€
-• Emporter: -{RESTAURANT_DATA['services']['emporter']['reduction']}%
-• Sur place
-
-PAIEMENTS: {', '.join(RESTAURANT_DATA['paiements'])}
-
-SUPPLÉMENTS:
-• Fromage: +1€
-• Extra viande: +2€
-"""
+    return "Commande en cours"
 
 
 def get_ai_response(history, user_input):
     """
-    Génère une réponse IA avec mémoire contextuelle
+    Génère une réponse IA avec mémoire contextuelle depuis le CSV
 
     Args:
-        history: Historique de la conversation (sans le dernier message user)
+        history: Historique de la conversation
         user_input: Dernier message de l'utilisateur
 
     Returns:
@@ -140,8 +139,11 @@ def get_ai_response(history, user_input):
     stage = detect_conversation_stage(history)
     order_summary = extract_order_summary(history)
 
-    # Construire le menu pour le contexte
+    # Construire le contexte menu depuis le CSV
     menu_context = build_menu_context()
+
+    # Récupérer les sauces depuis la config
+    sauces = ", ".join(RESTAURANT_DATA["sauces"][:8]) + "..."
 
     # Construction du prompt système adaptatif
     system_prompt = f"""Tu es l'assistant vocal de {RESTAURANT_NAME}, {RESTAURANT_DATA['info']['type']}.
@@ -157,144 +159,150 @@ def get_ai_response(history, user_input):
 
 1. COMMANDE INITIALE:
    - Demander "Que souhaitez-vous commander?"
-   - Si client dit "kebab" ou "grec" → c'est la même chose (Kebab à 7.50€)
-   - Proposer TOUJOURS le menu: "Souhaitez-vous prendre un menu avec boisson?"
+   - Identifier l'article dans le CSV (utiliser nom_affiche ou synonymes)
+   - Si article trouvé ET peut_etre_menu=true → proposer le menu
+   - Exemple: "Menu Kebab avec boisson ?" (ne pas donner le prix)
 
-2. SI MENU KEBAB/GREC (9.50€):
-   - Sauce: "Quelle sauce?" (NE PAS LISTER TOUTES LES SAUCES, sauf si demandé)
-   - Crudités: "Quelles crudités?" (NE PAS LISTER, sauf si demandé)
-   - Boisson: "Quelle boisson?" (NE PAS LISTER, sauf si demandé)
-   - Options: "Des suppléments?" (NE PAS LISTER les prix, sauf si demandé)
+2. POUR CHAQUE ARTICLE:
 
-   ⚠️ IMPORTANT: Ne liste les options que si le client demande "Quoi comme sauces?" ou "Lesquelles?"
+   A) SI MENU ACCEPTÉ:
+   - Sauce: "Quelle sauce?" (UNE SEULE sauce, si client dit plusieurs → demander laquelle choisir)
+   - Boisson: "Quelle boisson?" (lister si demandé: Coca 25cl, Coca 50cl, Evian, etc.)
+   - Accepter toutes boissons raisonnables (Coca, Ice Tea, Fanta, Sprite, etc.) même si pas dans CSV exact
 
-3. SI MENU TACOS (10.50€):
-   - Type de viande: "Quel tacos?" (Poulet, Viande, Mixte, Cordon Bleu, XXL)
-   - Sauce: "Quelle sauce?"
-   - Crudités: "Quelles crudités?" ou "sans X"
-   - Boisson: "Quelle boisson?"
-   - Options: "Des suppléments?"
+   B) SI ARTICLE SEUL:
+   - Demander uniquement les options pertinentes
+   - Pas de boisson si pas menu
 
-4. SI KEBAB/GREC SEUL (7.50€):
-   - Sauce: "Quelle sauce?"
-   - Crudités: "Quelles crudités?" ou noter "sans X"
-   - Options: "Des suppléments?"
-
-4. APRÈS CHAQUE ARTICLE:
+3. APRÈS CHAQUE ARTICLE:
    - TOUJOURS dire: "Ça sera tout?" ou "Autre chose?"
-   - JAMAIS dire "Combien voulez-vous?"
+   - JAMAIS "Combien voulez-vous?"
    - Si client dit "oui" ou "c'est bon" → passer à la livraison
-   - Si client ajoute autre chose → recommencer depuis étape 1
+   - Si client ajoute article → recommencer étape 1
 
-5. TYPE DE COMMANDE:
+4. TYPE DE COMMANDE:
    - "Sur place, à emporter ou livraison?"
 
-6. INFOS CLIENT:
+5. INFOS CLIENT:
    - Nom
    - Téléphone
    - Si livraison: Adresse complète
 
-7. PAIEMENT (OBLIGATOIRE):
+6. PAIEMENT (OBLIGATOIRE):
    - "Espèces, carte ou ticket restaurant?"
-   - NE JAMAIS OUBLIER CETTE ÉTAPE
 
-8. RÉCAPITULATIF FINAL (TRÈS IMPORTANT):
-   - Liste TOUS les articles commandés avec TOUS les détails
-   - Pour chaque article : 
-     * Si MENU : "Menu [Article]" (ex: Menu Kebab, Menu Tacos, Menu Burger)
-     * Type de viande (si tacos)
-     * TOUTES les sauces mentionnées
-     * TOUTES les crudités ou "sans crudités"
-     * Boisson (si menu)
-   - Total calculé précisément AVANT réduction
-   - Si emporter : mentionner la réduction -10% et calculer le nouveau total
-   - Type de commande
-   - Infos client
-   - Paiement
-   - Format : "Menu Kebab sauce X, crudités Y, boisson Z. À emporter avec -10%. Total initial A€, après réduction B€. Paiement C. Merci! Prêt dans X minutes. END_CALL"
+7. RÉCAPITULATIF FINAL (TRÈS IMPORTANT):
+   - AVANT de dire le récap, RELIS TOUTE la conversation pour identifier TOUS les articles
+   - Lister TOUS les articles commandés dans l'ordre chronologique
+   - Pour chaque article mentionner:
+     * Si MENU: "Menu [Article]" + sauce(s) + boisson
+     * Si SEUL: "[Article]" + détails
+   - Calculer le VRAI total en additionnant TOUS les prix de TOUS les articles
+   - Ne JAMAIS oublier un article qui a été commandé plus tôt dans la conversation
+
+   EXEMPLE DE RÉCAP COMPLET:
+   "Menu Kebab sauce algérienne Ice Tea, Menu Pizza Orientale Coca, Tarte Tatin. Sur place. Total 24.50€. Jafar 0767021139, espèces. Merci! Prêt dans 15 minutes. END_CALL"
+
+   ⚠️ CRITIQUE: Avant de faire le récap, vérifie mentalement:
+   - Combien d'articles différents ont été commandés dans TOUTE la conversation?
+   - Est-ce que je les ai TOUS listés dans mon récap?
+   - Est-ce que mon total correspond à la somme de TOUS les prix?
 
 ✅ RÈGLES STRICTES:
-• Maximum 12 mots par réponse (sauf si client demande la liste)
-• TOUJOURS proposer le menu au début
-• Dire "Ça sera tout?" après chaque article, PAS "Combien?"
-• "Grec" = "Kebab" (même chose)
-• Questions COURTES : "Quelle sauce?", "Quelle boisson?", "Quelles crudités?"
-• Lister les options UNIQUEMENT si le client demande "Lesquelles?" ou "Quoi comme...?"
-• Remplir toutes les cases: sauce, crudités, boisson (si menu), options
-• Ton chaleureux et naturel comme dans un vrai restaurant
-• Se souvenir de TOUT ce qui a été dit pendant TOUT L'APPEL
-• JAMAIS oublier la commande en cours
+• Maximum 15 mots par réponse (sauf récap final et listes demandées)
+• UNE SEULE sauce par sandwich/burger/kebab
+• Si client dit plusieurs sauces → demander "Laquelle préférez-vous?"
+• Accepter boissons courantes même si pas exact dans CSV (Coca, Ice Tea, Fanta, Sprite, Oasis)
+• TOUJOURS se souvenir de TOUS les articles commandés
+• RÉCAP FINAL = liste complète de TOUT ce qui a été commandé
+• Total = somme de TOUS les prix (menu ou unitaire selon le cas)
 
-🥤 GESTION DES BOISSONS SUPPLÉMENTAIRES:
-• Si client dit "une autre boisson" ou "ajouter une boisson" APRÈS avoir déjà choisi une boisson de menu
-• TOUJOURS clarifier : "Souhaitez-vous changer la boisson du menu ou ajouter une boisson supplémentaire ?"
-• Si AJOUTER : préciser le prix (2.50€ par boisson)
-• Si CHANGER : remplacer la boisson du menu (inclus dans le prix)
-• Dans le récap : distinguer "boisson du menu" et "boissons supplémentaires"
+🥤 GESTION BOISSONS:
+• Menu Kebab = 9€ (avec boisson)
+• Menu Burger = prix_menu du burger (avec boisson)
+• Menu Tacos = prix_menu du tacos (avec boisson)
+• Boisson seule = 2.50€ environ
+• Accepter: Coca, Ice Tea, Fanta, Sprite, Oasis, Evian, etc.
+
+🧮 CALCUL TOTAL (EXEMPLE):
+Menu Kebab (9€) + Menu Cheese Burger (11.50€) + Milk Shake (4€) = 24.50€
 
 ❌ INTERDICTIONS:
-• Ne JAMAIS demander "Combien voulez-vous?"
-• Ne JAMAIS dire "Combien de X?"
-• Ne JAMAIS oublier de proposer le menu
-• Ne pas accepter des articles qui n'existent pas (vérifier le menu)
-• Ne pas inventer de prix
-• Ne JAMAIS oublier "Menu" dans le récapitulatif si c'est un menu
-• Ne JAMAIS oublier la boisson dans le récapitulatif si c'est un menu
-• Ne pas appliquer de réduction sans le mentionner clairement
-• TOUJOURS calculer à partir du prix du menu (9.50€ kebab, 10.50€ tacos, 12.50€ burger)
-• Si boisson seule demandée : prix 2.50€, PAS dans un menu
+• Ne JAMAIS oublier un article commandé dans le récap
+• Ne JAMAIS dire "boisson non incluse" si c'est un menu
+• Ne JAMAIS calculer un total partiel
+• Ne JAMAIS accepter plusieurs sauces (forcer le choix d'UNE seule)
+• Ne pas refuser Ice Tea, Fanta, Sprite si client demande
 
-📝 EXEMPLE DE CONVERSATION PARFAITE:
-Client: "Un grec"
-Toi: "Menu avec boisson?" (PAS de prix)
+🎤 MÉMOIRE CONVERSATIONNELLE:
+Tu DOIS te souvenir de TOUT ce qui a été dit:
+- Tous les articles commandés (kebab, burger, dessert, etc.)
+- Toutes les sauces choisies
+- Toutes les boissons demandées
+- Tous les détails de personnalisation
+
+Dans le récap final, LISTE ABSOLUMENT TOUT dans l'ordre chronologique.
+
+SAUCES DISPONIBLES: {sauces}
+
+📝 EXEMPLE PARFAIT:
+Client: "Un kebab"
+Toi: "Menu avec boisson?"
 
 Client: "Oui"
-Toi: "Quelle sauce?" (PAS de liste)
+Toi: "Quelle sauce?"
 
-Client: "Lesquelles vous avez?"
-Toi: "Blanche, Harissa, Algérienne, Barbecue, Mayo, Ketchup, Curry, Samouraï, Andalouse"
+Client: "Algérienne et barbecue"
+Toi: "Désolé, une seule sauce. Algérienne ou barbecue?"
 
 Client: "Algérienne"
-Toi: "Quelles crudités?"
-
-Client: "Tout sauf oignons"
 Toi: "Quelle boisson?"
 
 Client: "Ice Tea"
-Toi: "Des suppléments?"
+Toi: "Parfait. Ça sera tout?"
 
-Client: "Non"
+Client: "Un burger cheese"
+Toi: "Menu avec boisson?"
+
+Client: "Oui"
+Toi: "Quelle boisson?"
+
+Client: "Coca"
+Toi: "Ça sera tout?"
+
+Client: "Un milkshake"
+Toi: "Quel parfum?"
+
+Client: "Chocolat"
 Toi: "Ça sera tout?"
 
 Client: "Oui"
 Toi: "Sur place, emporter ou livraison?"
 
-Client: "Livraison"
-Toi: "Votre nom?"
+Client: "Sur place"
+Tou: "Votre nom?"
 
-Client: "Ahmed"
+Client: "Jafar"
 Toi: "Votre téléphone?"
 
-Client: "0612345678"
-Toi: "Votre adresse?"
+Client: "0767021139"
+Toi: "Espèces ou carte?"
 
-Client: "5 rue de Paris"
-Toi: "Espèces, carte ou ticket restaurant?"
-
-Client: "Carte"
-Toi: "Menu Kebab sauce algérienne, sans oignons, Ice Tea, livraison 5 rue de Paris, Ahmed 0612345678, carte. Total 12 euros. Merci! Prêt dans 30 minutes. END_CALL"
+Client: "Espèces"
+Toi: "Menu Kebab sauce algérienne Ice Tea, Menu Cheese Burger Coca, Milk Shake chocolat. Sur place. Total 24.50€. Jafar 0767021139, espèces. Merci! Prêt dans 15 minutes. END_CALL"
 """
 
     # Construction des messages pour l'API
     messages = [{"role": "system", "content": system_prompt}]
 
-    # Ajouter les 10 derniers messages de l'historique (pour ne pas dépasser le contexte)
+    # Ajouter TOUS les messages de l'historique (pas seulement les 10 derniers)
+    # pour garantir que l'IA se souvienne de TOUT
     messages.extend([
         {"role": msg["role"], "content": msg["content"]}
-        for msg in history[-10:]
+        for msg in history
     ])
 
-    # Ajouter le message actuel de l'utilisateur
+    # Ajouter le message actuel
     messages.append({"role": "user", "content": user_input})
 
     try:
@@ -304,14 +312,12 @@ Toi: "Menu Kebab sauce algérienne, sans oignons, Ice Tea, livraison 5 rue de Pa
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
-            temperature=0.3,  # Un peu de créativité mais reste cohérent
-            max_tokens=80,  # Limiter la longueur
-            timeout=3  # Timeout de 3 secondes
+            temperature=0.3,
+            max_tokens=150,  # Augmenté pour le récap final
+            timeout=5  # Timeout de 5 secondes
         )
 
         ai_reply = response.choices[0].message.content.strip()
-
-        # Nettoyage de la réponse
         ai_reply = ai_reply.replace('"', '').replace('*', '')
 
         return ai_reply
@@ -319,7 +325,6 @@ Toi: "Menu Kebab sauce algérienne, sans oignons, Ice Tea, livraison 5 rue de Pa
     except Exception as e:
         print(f"❌ Erreur API OpenAI: {e}")
 
-        # Réponse de secours selon l'étape
         fallback_responses = {
             "commande": "Que souhaitez-vous commander?",
             "livraison": "Sur place, emporter ou livraison?",
@@ -335,7 +340,6 @@ Toi: "Menu Kebab sauce algérienne, sans oignons, Ice Tea, livraison 5 rue de Pa
 @app.route("/voice", methods=["POST"])
 def voice():
     """Point d'entrée initial de l'appel"""
-
     call_sid = request.values.get("CallSid", "unknown")[:8]
     caller = request.values.get("From", "inconnu")
 
@@ -348,11 +352,10 @@ def voice():
         voice="Google.fr-FR-Neural2-B"
     )
 
-    # Gather pour capturer la réponse vocale
     gather = Gather(
         input="speech",
         language="fr-FR",
-        speechTimeout="auto",  # Détection automatique de la fin de parole
+        speechTimeout="auto",
         action="/process",
         method="POST",
         hints="pizza burger kebab tacos frites sandwich menu boisson livraison emporter",
@@ -360,8 +363,6 @@ def voice():
     )
 
     response.append(gather)
-
-    # Si pas de réponse après le timeout
     response.say(
         "Je n'ai pas entendu votre réponse. Au revoir.",
         language="fr-FR",
@@ -374,14 +375,12 @@ def voice():
 @app.route("/process", methods=["POST"])
 def process():
     """Traite chaque réponse vocale du client"""
-
     speech = request.values.get("SpeechResult", "").strip()
     call_sid = request.values.get("CallSid", "unknown")[:8]
     confidence = request.values.get("Confidence", "0")
 
     print(f"\n📞 [{call_sid}] 👤 Client: '{speech}' (confiance: {confidence})")
 
-    # Si pas de parole détectée
     if not speech:
         response = VoiceResponse()
         response.say(
@@ -441,14 +440,10 @@ def process():
     )
 
     if should_end:
-        # Terminer l'appel
         print(f"📴 [{call_sid}] ✅ APPEL TERMINÉ - Commande complète")
         response.hangup()
-
-        # Sauvegarder la commande complète (optionnel)
         save_order(call_sid, conv)
     else:
-        # Continuer la conversation
         gather = Gather(
             input="speech",
             language="fr-FR",
@@ -459,29 +454,26 @@ def process():
         )
         response.append(gather)
 
-        # Message si timeout
         response.say(
             "Êtes-vous toujours là? Au revoir.",
             language="fr-FR",
             voice="Google.fr-FR-Neural2-B"
         )
 
-    # Nettoyage périodique
     cleanup_old_conversations()
 
     return Response(str(response), mimetype="text/xml")
 
 
 def save_order(call_sid, conversation):
-    """Sauvegarde la commande finale (optionnel)"""
+    """Sauvegarde la commande finale avec extraction CSV"""
     try:
-        # Créer le dossier orders s'il n'existe pas
         os.makedirs("orders", exist_ok=True)
 
         timestamp = datetime.now()
         date_str = timestamp.strftime('%Y%m%d_%H%M%S')
 
-        # 1. Sauvegarder la conversation complète (JSON technique)
+        # 1. Sauvegarder la conversation complète (JSON)
         order_data = {
             "call_sid": call_sid,
             "timestamp": timestamp.isoformat(),
@@ -494,7 +486,7 @@ def save_order(call_sid, conversation):
 
         print(f"💾 Conversation sauvegardée: {filename_json}")
 
-        # 2. Créer un fichier lisible pour le restaurateur
+        # 2. Créer bon de commande lisible
         order_summary = extract_order_from_conversation(conversation, call_sid, timestamp)
 
         filename_txt = f"orders/commande_{call_sid}_{date_str}.txt"
@@ -508,14 +500,19 @@ def save_order(call_sid, conversation):
 
 
 def extract_order_from_conversation(conversation, call_sid, timestamp):
-    """Extrait les informations importantes de la conversation pour créer un bon de commande"""
+    """Extrait les informations de commande depuis la conversation"""
+    import re
 
-    # Extraire les infos de la conversation
+    # Initialisation des variables
     client_name = ""
     client_phone = ""
     client_address = ""
     delivery_type = ""
     payment_method = ""
+    order_items = []
+    total = ""
+    initial_total = ""
+    discount_info = ""
 
     # Parser la conversation pour extraire les infos
     for i, msg in enumerate(conversation):
@@ -556,55 +553,43 @@ def extract_order_from_conversation(conversation, call_sid, timestamp):
                 elif "ticket" in content:
                     payment_method = "Ticket restaurant"
 
-    # Extraire les articles et le total du récapitulatif final
-    order_items = []
-    total = ""
-    initial_total = ""
-    discount_info = ""
-
+    # Extraire les articles du récapitulatif final
     for msg in reversed(conversation):
         if msg["role"] == "assistant" and "END_CALL" in msg.get("content", ""):
             recap = msg["content"]
 
-            # Extraire le total
-            import re
-
-            # Chercher "Total initial X€, après réduction Y€"
+            # Extraire le total avec réduction
             reduction_match = re.search(
-                r'total initial\s+(\d+(?:[.,]\d+)?)\s*€.*après réduction\s+(\d+(?:[.,]\d+)?)\s*€', recap.lower())
+                r'total initial\s+(\d+(?:[.,]\d+)?)\s*€.*après réduction\s+(\d+(?:[.,]\d+)?)\s*€',
+                recap.lower()
+            )
             if reduction_match:
                 initial_total = reduction_match.group(1).replace(',', '.') + " €"
                 total = reduction_match.group(2).replace(',', '.') + " €"
                 discount_info = " (réduction -10% appliquée)"
             else:
-                # Chercher "Total X euros" ou "Total: X€"
                 total_match = re.search(r'total\s*:?\s*(\d+(?:[.,]\d+)?)\s*(?:euros?|€)', recap.lower())
                 if total_match:
                     total = total_match.group(1).replace(',', '.') + " €"
 
-            # Parser le récapitulatif pour extraire les articles
-            recap_clean = recap.replace("Récapitulatif:", "").replace("Récapitulatif de votre commande :", "").replace(
-                "END_CALL", "").strip()
+            # Parser le récapitulatif pour les articles
+            recap_clean = recap.replace("END_CALL", "").strip()
 
-            # Retirer la partie après "Total"
             if "Total" in recap_clean or "total" in recap_clean:
                 recap_items = re.split(r'[Tt]otal', recap_clean)[0].strip()
             else:
                 recap_items = recap_clean
 
-            # Retirer aussi les remerciements
             recap_items = re.split(r'[Mm]erci', recap_items)[0].strip()
 
-            # Parser les segments (séparés par des points)
+            # Segments séparés par des points
             segments = recap_items.split('.')
 
             for segment in segments:
                 segment = segment.strip()
-                # Ignorer les segments vides ou trop courts
                 if not segment or len(segment) < 5:
                     continue
 
-                # Ignorer les infos client, paiement, etc.
                 skip_keywords = ['votre', 'sera', 'prêt', 'minute', 'merci', 'paiement',
                                  'espèces', 'carte', 'ticket', 'livraison au', 'emporter',
                                  'sur place', 'nom', 'téléphone', 'adresse']
@@ -612,27 +597,10 @@ def extract_order_from_conversation(conversation, call_sid, timestamp):
                 if any(keyword in segment.lower() for keyword in skip_keywords):
                     continue
 
-                # C'est probablement un article
-                # Capitaliser la première lettre
                 if segment:
                     order_items.append(segment[0].upper() + segment[1:])
 
             break
-
-    # Si pas d'items trouvés, essayer une extraction plus simple
-    if not order_items:
-        for msg in reversed(conversation):
-            if msg["role"] == "assistant" and "END_CALL" in msg.get("content", ""):
-                recap = msg["content"]
-                # Chercher les lignes qui commencent par "-"
-                lines = recap.split('\n')
-                for line in lines:
-                    line = line.strip()
-                    if line.startswith('-'):
-                        cleaned = line[1:].strip()
-                        if cleaned and len(cleaned) > 5:
-                            order_items.append(cleaned.capitalize())
-                break
 
     # Construire le bon de commande
     bon = []
@@ -713,7 +681,9 @@ def home():
         "restaurant": RESTAURANT_NAME,
         "active_conversations": len(conversations),
         "ai_enabled": client is not None,
-        "version": "2.0"
+        "menu_items": len(MENU_DATA),
+        "categories": len(get_all_categories()),
+        "version": "2.0-CSV"
     })
 
 
@@ -726,7 +696,34 @@ def stats():
         "restaurant": RESTAURANT_NAME,
         "conversations_actives": len(conversations),
         "total_messages": sum(len(conv) for conv in conversations.values()),
-        "ai_status": "active" if client else "inactive"
+        "ai_status": "active" if client else "inactive",
+        "menu_items_csv": len(MENU_DATA),
+        "categories": get_all_categories()
+    })
+
+
+@app.route("/api/menu", methods=["GET"])
+def get_menu():
+    """Retourne le menu depuis le CSV"""
+    return jsonify({
+        "restaurant": RESTAURANT_NAME,
+        "total_items": len(MENU_DATA),
+        "categories": get_all_categories(),
+        "items": MENU_DATA[:20]  # Premiers 20 items
+    })
+
+
+@app.route("/api/search", methods=["GET"])
+def search_menu():
+    """Recherche dans le menu CSV"""
+    query = request.args.get("q", "")
+    if not query:
+        return jsonify({"error": "Paramètre 'q' requis"}), 400
+
+    results = search_items(query)
+    return jsonify({
+        "query": query,
+        "results": results
     })
 
 
@@ -765,13 +762,12 @@ def clear():
 @app.after_request
 def after_request(response):
     """Nettoyage automatique après chaque requête"""
-    # NE NETTOYER QUE toutes les 10 requêtes pour éviter de supprimer pendant un appel
     if not hasattr(app, 'request_count'):
         app.request_count = 0
 
     app.request_count += 1
 
-    # Nettoyer seulement toutes les 10 requêtes
+    # Nettoyer toutes les 10 requêtes
     if app.request_count % 10 == 0:
         cleanup_old_conversations()
 
@@ -782,11 +778,13 @@ def after_request(response):
 
 if __name__ == "__main__":
     print("\n" + "=" * 60)
-    print("🍔 AGENT IA RESTAURANT - SYSTÈME VOCAL INTELLIGENT")
+    print("🍔 AGENT IA RESTAURANT - SYSTÈME VOCAL INTELLIGENT (CSV)")
     print("=" * 60)
     print(f"🏪 Restaurant: {RESTAURANT_NAME}")
     print(f"🤖 IA: {'✅ Active (OpenAI)' if client else '❌ Inactive'}")
     print(f"🧠 Mémoire: {MEMORY_TIMEOUT // 60} minutes")
+    print(f"📊 Articles CSV: {len(MENU_DATA)}")
+    print(f"📂 Catégories: {len(get_all_categories())}")
     print(f"🌐 URL locale: http://localhost:5000")
     print(f"📞 Webhook: http://votre-ngrok.com/voice")
     print("=" * 60)
